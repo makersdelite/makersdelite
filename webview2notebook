@@ -1,22 +1,117 @@
+This page simply is used for conceptual notes. All code snippets not valid for production.
 
-Notebook-Entry: Depicting intercepting a XHR POST from javascript upload using
-Sources:
+Notebook-Entry: Depicting intercepting a XHR POST from vanilla javascript file upload keeping these sources in mind:
+
 https://weblog.west-wind.com/posts/2021/Jan/14/Taking-the-new-Chromium-WebView2-Control-for-a-Spin-in-NET-Part-1
 https://weblog.west-wind.com/posts/2021/Jan/14/Taking-the-new-Chromium-WebView2-Control-for-a-Spin-in-NET-Part-2
 https://www.smashingmagazine.com/2018/01/drag-drop-file-uploader-vanilla-js/
+https://stackoverflow.com/questions/14781574/javascript-interface-and-dto
 https://codepen.io/joezimjs/pen/yPWQbd
+https://getgoingit.blogspot.com/2016/05/uploading-file-using-ajax-and-wcf-rest.html
+https://weblogs.asp.net/jdanforth/webview2-getting-started   
 
-concepts
-- text based json formatted communication using an anemic DTO (= Data Transfer Object) aproach
+*** CONCEPTS ***
+- KEEP IN MIND: NUGET install of WebView2 control wrapper installment (without edge / webView2 runtime. See below)
+
+- KEEP IN MIND: EverGreen or Fixed EDGE runtime
+
+I've used a FixedRuntime approach registration within WindowsForms user controls because of missinge elevation / admin priveleges. 
+Get FixedVersion from creators WebView2 related download section and extract it with 7Zip directly to the execution path of your windows forms app. 
+
+source: https://developer.microsoft.com/en-us/microsoft-edge/webview2/
+
+
+async void InitializeAsync()
+        {
+            var exeDirectory = IoHelper.GetCurrentExeDirectory();
+            if (exeDirectory == null)
+            {
+                return;
+            }
+            if (exeDirectory.Trim().Length == 0)
+            {
+                return;
+            }
+            var webView2RuntimePath = @"Microsoft.WebView2.FixedVersionRuntime.91.0.864.64.x64";
+            var webViewRuntimeDirectory = exeDirectory + @"\" + webView2RuntimePath;
+            var directoryExist = IoHelper.DirectoryExists(webViewRuntimeDirectory);
+            if (directoryExist == false)
+            {
+                return;
+            }
+            this.WBC.OnWebViewDomLoaded += WBC_OnWebViewDomLoaded;
+            var htmlText = this.GetHtmlText();
+            await this.WBC.InitializeAsync(webViewRuntimeDirectory, htmlText);
+        }
+
+public async Task<bool> InitializeAsync(string webViewRuntimeDirectory, string htmlText)
+        {
+            bool retVal = false;
+            var directoryExist = IoHelper.DirectoryExists(webViewRuntimeDirectory);
+            if (directoryExist == false)
+            {
+                return retVal;
+            }
+            this.WebView.CreationProperties = new CoreWebView2CreationProperties { BrowserExecutableFolder = webViewRuntimeDirectory };
+            
+	    this.WebView.NavigationCompleted += WebView_NavigationCompleted;
+            this.WebView.CoreWebView2InitializationCompleted += WebView_CoreWebView2InitializationCompleted;
+            this.WebView.WebMessageReceived += WebView_WebMessageReceived;
+            
+	    await this.WebView.EnsureCoreWebView2Async(null);
+            
+	    this.WebView.CoreWebView2.ContentLoading += CoreWebView2_ContentLoading;
+            this.WebView.CoreWebView2.DOMContentLoaded += CoreWebView2_DOMContentLoaded;
+            this.WebView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
+            this.WebView.CoreWebView2.WebResourceResponseReceived += CoreWebView2_WebResourceResponseReceived;
+            
+            this.WebView.CoreWebView2.SetVirtualHostNameToFolderMapping("allegra", "WebView2Content", Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+            this.IsDomReady = false;
+            this.WebView.NavigateToString(htmlText);
+            return retVal;
+        }
+
+
+
+- KEEP IN MIND: WebView2 is able to act as a "virtual web server". At WV2 init simply apply SetVirtualHostNameToFolderMapping as described here:
+  
+  https://weblog.west-wind.com/posts/2021/Jan/26/Chromium-WebView2-Control-and-NET-to-JavaScript-Interop-Part-2
+    
+  this.WebView.CoreWebView2.SetVirtualHostNameToFolderMapping("<your-virtual-url-folder>", "<your-physical-folder-within-winform-exe-app", Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+
+ EXAMPLE:
+ 	
+	A) this is your WindowsForms app
+		
+		c:\programs\apps\yournicewv2app\yournicewv2app.exe
+	
+	B) Then create a physical e.g. yourphysicalwebfolder folder at
+	
+		c:\programs\apps\yournicewv2app\yourphysicalwebfolder
+	
+	C) Within yourphysicalwebfolder (and subsequent subfolders e.g. lib, images, upload etc.) you simply put all relevant ressources e.g. js, css, image files etc.
+
+	D) Within your WindowsForms WebView 2 init code simply assign
+	
+	this.WebView.CoreWebView2.SetVirtualHostNameToFolderMapping("supadupacoolapp", "yourphysicalwebfolder", Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+
+	E) Then within a HTML - Page that you navigate to resp. put as WebView2 source simple add necessary ressources as follows:
+	
+	 <link rel='stylesheet' href='https://supadupacoolapp/lib/bootstrap-5.0.2-dist/css/bootstrap.min.css'>
+         <link rel='stylesheet' href='https://supadupacoolapp/lib/customs/custom-multiple-file-uploader-20210707-1111/uploader.css'>
+         <script src='https://supadupacoolapp/lib/bootstrap-5.0.2-dist/js/bootstrap.js'></script>
+	 <script src='https://supadubacoolapp/lib/customs/custom-multiple-file-uploader-20210707-1111/uploader.js'></script>
+
+- pure text based json formatted payload communication using an anemic DTO (= Data Transfer Object) approach
 - DTO is "known" on both sides: JS and WV2 Side
 - Using javascripts FileReader object and its built-in base64 readAsDataUrl - converter for storing a plain text "blob" into a DTO property (here: FileBase64Raw)
+  FileReaders onLoad - method used for converting binary file content to base64 text format AND creating a XHR object for sending subsequent stuff to WV2 - "server"
 - On WV2 - side JSON.NET is used for deserialization purposes resp. converting a plain text json structure into an anemic POCO DTO object
   e.g. var fileDto = JsonConvert.DeserializeObject<FileDto>(jsonText);
 
 
-*** JS-SIDE:
+*** JS-SIDE ***
 
-//https://stackoverflow.com/questions/14781574/javascript-interface-and-dto
 function FileDto() 
     {
     var FileName = '';
@@ -62,21 +157,17 @@ var url = 'https://<webview2-virtual-folder-path>'
                 xhr.send(jsonDto );
             };
 
-
-
 *** WV2-SIDE: WebResourceResponseReceived
-
 public class FileDto
-    {
-        public string FileName { get; set; }
-        public string FileSize { get; set; }
-        public string FileBase64Raw { get; set; }
-        public string FileBase64{ get; set; }
-    }
+{
+   public string FileName { get; set; }
+   public string FileSize { get; set; }
+   public string FileBase64Raw { get; set; }
+   public string FileBase64{ get; set; }
+ }
 
 private void CoreWebView2_WebResourceResponseReceived(object sender, Microsoft.Web.WebView2.Core.CoreWebView2WebResourceResponseReceivedEventArgs e)
         {
-            //https://getgoingit.blogspot.com/2016/05/uploading-file-using-ajax-and-wcf-rest.html
             if (e.Request.Method.Trim().ToUpper() == "POST")
             {
                 var contentStream = e.Request.Content as Stream;
@@ -93,7 +184,7 @@ private void CoreWebView2_WebResourceResponseReceived(object sender, Microsoft.W
                     {
                         fileDto.FileBase64 = fileDto.FileBase64Raw.Substring(fileDto.FileBase64Raw.IndexOf(",") + 1);
                     }
-                    var filePath = @"c:\daten\" + fileDto.FileName;
+                    var filePath = @"<your-local-path>\"+ fileDto.FileName;
                     byte[] imageBytes = Convert.FromBase64String(fileDto.FileBase64);
                     File.WriteAllBytes(filePath, imageBytes);
                 }
