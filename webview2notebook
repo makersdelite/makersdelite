@@ -1,0 +1,101 @@
+
+Notebook-Entry: Depicting intercepting a XHR POST from javascript upload using
+Sources:
+https://weblog.west-wind.com/posts/2021/Jan/14/Taking-the-new-Chromium-WebView2-Control-for-a-Spin-in-NET-Part-1
+https://weblog.west-wind.com/posts/2021/Jan/14/Taking-the-new-Chromium-WebView2-Control-for-a-Spin-in-NET-Part-2
+https://www.smashingmagazine.com/2018/01/drag-drop-file-uploader-vanilla-js/
+https://codepen.io/joezimjs/pen/yPWQbd
+
+concepts
+- text based json formatted communication using an anemic DTO (= Data Transfer Object) aproach
+- DTO is "known" on both sides: JS and WV2 Side
+- Using javascripts FileReader object and its built-in base64 readAsDataUrl - converter for storing a plain text "blob" into a DTO property (here: FileBase64Raw)
+- On WV2 - side JSON.NET is used for deserialization purposes resp. converting a plain text json structure into an anemic POCO DTO object
+  e.g. var fileDto = JsonConvert.DeserializeObject<FileDto>(jsonText);
+
+
+*** JS-SIDE:
+
+//https://stackoverflow.com/questions/14781574/javascript-interface-and-dto
+function FileDto() 
+    {
+    var FileName = '';
+    var FileSize = '';
+    var FileBase64 = '';
+    var FileBase64Raw = '';
+    return {
+       FileName: '',
+       FileSize: '',
+       FileBase64: '',
+       FileBase64Raw: ''
+       };
+    };
+
+
+var url = 'https://<webview2-virtual-folder-path>'
+      //--- XHR BASE64 UPLOADER ---
+	    var reader = new FileReader();
+            reader.onload = handleReaderLoad;
+            reader.readAsDataURL(file);
+            function handleReaderLoad(evt) {
+                var cat =  evt.target.result;
+                var dtoItem = FileDto();
+                dtoItem.fileName = file.name;
+                dtoItem.fileSize = file.size;
+                dtoItem.fileBase64Raw = cat;
+                var jsonDto = JSON.stringify(dtoItem);               
+                var xhr = new XMLHttpRequest();
+  		xhr.upload.addEventListener('progress', function(e) {
+    			updateProgress(i, (e.loaded * 100.0 / e.total) || 100)
+  		});
+
+  		xhr.addEventListener('readystatechange', function(e) {
+    		if (xhr.readyState == 4 && xhr.status == 200) {
+      			// use this for progress updates
+    		}
+    		else if (xhr.readyState == 4 && xhr.status != 200) {
+      		  // use this for exception handling
+    		}
+  		});
+                var serviceURL = url;
+                xhr.open('POST', serviceURL, true);
+                xhr.send(jsonDto );
+            };
+
+
+
+*** WV2-SIDE: WebResourceResponseReceived
+
+public class FileDto
+    {
+        public string FileName { get; set; }
+        public string FileSize { get; set; }
+        public string FileBase64Raw { get; set; }
+        public string FileBase64{ get; set; }
+    }
+
+private void CoreWebView2_WebResourceResponseReceived(object sender, Microsoft.Web.WebView2.Core.CoreWebView2WebResourceResponseReceivedEventArgs e)
+        {
+            //https://getgoingit.blogspot.com/2016/05/uploading-file-using-ajax-and-wcf-rest.html
+            if (e.Request.Method.Trim().ToUpper() == "POST")
+            {
+                var contentStream = e.Request.Content as Stream;
+                if(contentStream != null)
+                {
+                    var reader = new StreamReader(contentStream);
+                    string jsonText = reader.ReadToEnd();
+                    var fileDto = JsonConvert.DeserializeObject<FileDto>(jsonText);
+                    if(fileDto == null)
+                    {
+                        return;
+                    }
+                    if (fileDto.FileBase64Raw != null && fileDto.FileBase64Raw.Trim().Length > 0)
+                    {
+                        fileDto.FileBase64 = fileDto.FileBase64Raw.Substring(fileDto.FileBase64Raw.IndexOf(",") + 1);
+                    }
+                    var filePath = @"c:\daten\" + fileDto.FileName;
+                    byte[] imageBytes = Convert.FromBase64String(fileDto.FileBase64);
+                    File.WriteAllBytes(filePath, imageBytes);
+                }
+            }
+        }
