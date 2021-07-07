@@ -65,7 +65,7 @@ public async Task<bool> InitializeAsync(string webViewRuntimeDirectory, string h
             this.WebView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
             this.WebView.CoreWebView2.WebResourceResponseReceived += CoreWebView2_WebResourceResponseReceived;
             
-            this.WebView.CoreWebView2.SetVirtualHostNameToFolderMapping("allegra", "WebView2Content", Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+            this.WebView.CoreWebView2.SetVirtualHostNameToFolderMapping("myapp", "WebView2Content", Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
             this.IsDomReady = false;
             this.WebView.NavigateToString(htmlText);
             return retVal;
