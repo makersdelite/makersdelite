@@ -1,1 +1,9 @@
 
+*** Possible Pitfalls ***
+
+---- IFRAME - ISSUES ----
+  > clicks on inserted IFRAME content e.g. an SVG animation produced by inkscape based "sozi" presentation block subsequent mouse clicks of parent document within WebView2 - Control
+  > WebView2 freezes completely after one single click on iframe's content. Therefore no iframe content at the moment
+  > Event Propagation Issue
+      https://stackoverflow.com/questions/41766035/make-iframe-click-through-but-not-the-iframes-body
+      https://stackoverflow.com/questions/2381336/detect-click-into-iframe-using-javascript
