@@ -1,6 +1,10 @@
 
 *** Possible Pitfalls Javascript / HTML / CSS etc. regarding WebView2 Control ***
 
+---- SCROLLING ISSUES ---
+> TEST/CONFIRM APPROPRIATE SCROLLING (e.g. within a scrollable div)
+    https://stackoverflow.com/questions/635706/how-to-scroll-to-an-element-inside-a-div
+
 ---- Detected IFRAME - ISSUES ----
 Date: 20210712
   > clicks on inserted IFRAME content e.g. an SVG animation produced by inkscape based "sozi" presentation block subsequent mouse clicks of parent document within WebView2 - Control
